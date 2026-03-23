@@ -2,12 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Braille Remote Controller</title>
     
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
+        /* FIX 1: Universal Box-Sizing ensures elements don't "leak" out of their containers */
+        * {
+            box-sizing: border-box;
+        }
+
         :root {
             --bg-main: #000000;
             --bg-panel: #0a0a0a;
@@ -29,7 +34,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100dvh; /* FIX: Dynamic height for mobile browsers */
+            height: 100dvh; 
             overflow: hidden;
         }
 
@@ -37,14 +42,16 @@
             background: var(--bg-panel);
             width: 100%;
             max-width: 400px;
-            height: 100dvh; /* FIX: Matches body */
-            max-height: 850px;
+            height: 100dvh;
+            /* FIX 2: Ensures the remote never exceeds the actual screen height */
+            max-height: min(850px, 100dvh); 
             position: relative;
             border: 1px solid var(--border-color);
             user-select: none;
             -webkit-user-select: none;
         }
 
+        /* --- Design remains exactly as you had it --- */
         .header {
             display: flex;
             justify-content: space-between;
@@ -82,7 +89,6 @@
             z-index: 5;
         }
 
-        /* FIX: Prevents collision on small screens */
         @media (max-width: 380px) {
             .btn-cluster { width: 170px; }
             .action-btn { font-size: 12px; padding: 0 15px; }
@@ -103,7 +109,6 @@
             text-transform: uppercase;
         }
 
-        /* Icon Styling */
         .action-btn .icon {
             width: 22px;
             height: 22px;
@@ -114,10 +119,7 @@
             justify-content: center;
         }
 
-        .action-btn:active {
-            background: var(--accent-white);
-            color: var(--bg-main);
-        }
+        .action-btn:active { background: var(--accent-white); color: var(--bg-main); }
         .action-btn:active .icon, .action-btn:active .icon svg { fill: var(--bg-main); color: var(--bg-main); }
 
         .arc-container {
@@ -132,7 +134,8 @@
 
         .input-area {
             position: absolute;
-            bottom: 25px;
+            /* FIX 3: Respects the "Home Indicator" bar on modern phones */
+            bottom: max(20px, env(safe-area-inset-bottom)); 
             left: 20px;
             right: 20px;
             display: flex;
@@ -179,11 +182,9 @@
             <button class="action-btn" onclick="sendCommand('_seq_')">
                 <span class="icon" style="font-size: 20px;">▶</span>Seq
             </button>
-
             <button class="action-btn" onclick="sendCommand('_clear_')">
                 <span class="icon" style="font-size: 20px;">✕</span>Clear
             </button>
-
             <button class="action-btn" onclick="sendCommand('_reboot_')">
                 <span class="icon">
                     <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
@@ -241,45 +242,31 @@
 
         function sendCommand(cmd) { client.publish("tp/braille/input", cmd); }
 
-        /* --- Updated Arc Logic for Laptop & Phone --- */
         const arcContainer = document.getElementById("arcContainer");
         const ticksGroup = document.getElementById("ticks");
         let isDragging = false, startY = 0, startSpeed = 0;
 
-function renderWheel() {
+        function renderWheel() {
             ticksGroup.innerHTML = "";
             const cx = 130, cy = 150, rOuter = 120;
-            
             for (let s = 0.2; s <= 10; s += 0.2) {
-                // FIX: Round 's' to the nearest 10th to fix the "missing long hands" math glitch
                 const cleanS = Math.round(s * 10) / 10;
-                
                 const angle = Math.PI + (cleanS - currentSpeed) * -0.25;
                 const dist = Math.abs(angle - Math.PI);
-                
                 if (dist < 1.2) {
                     const isMajor = cleanS % 1 === 0;
                     const rInner = isMajor ? 104 : 112;
-                    
-                    ticksGroup.innerHTML += `<line 
-                        x1="${cx + rOuter * Math.cos(angle)}" 
-                        y1="${cy + rOuter * Math.sin(angle)}" 
-                        x2="${cx + rInner * Math.cos(angle)}" 
-                        y2="${cy + rInner * Math.sin(angle)}" 
-                        stroke="rgba(255,255,255,${1 - dist/1.2})" 
-                        stroke-width="${isMajor ? 3 : 2}" 
-                        stroke-linecap="round" />`;
+                    ticksGroup.innerHTML += `<line x1="${cx + rOuter * Math.cos(angle)}" y1="${cy + rOuter * Math.sin(angle)}" x2="${cx + rInner * Math.cos(angle)}" y2="${cy + rInner * Math.sin(angle)}" stroke="rgba(255,255,255,${1 - dist/1.2})" stroke-width="${isMajor ? 3 : 2}" stroke-linecap="round" />`;
                 }
             }
             speedDisplay.textContent = currentSpeed.toFixed(1);
         }
 
-        // Pointer Events work for both Mouse and Touch
         arcContainer.addEventListener("pointerdown", e => {
             isDragging = true;
             startY = e.clientY;
             startSpeed = currentSpeed;
-            arcContainer.setPointerCapture(e.pointerId); // Crucial for laptop dragging
+            arcContainer.setPointerCapture(e.pointerId);
         });
 
         window.addEventListener("pointermove", e => {
