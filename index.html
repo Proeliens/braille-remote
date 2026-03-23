@@ -8,9 +8,7 @@
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         :root {
             --bg-main: #000000;
@@ -25,13 +23,12 @@
             --btn-border: #333333;
         }
 
-        /* FIX: Ensure the HTML and Body are strictly restricted to the visible window */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             background: var(--bg-main);
-            overflow: hidden; /* Stops the whole page from bouncing/scrolling */
+            overflow: hidden;
         }
 
         body {
@@ -45,16 +42,17 @@
             background: var(--bg-panel);
             width: 100%;
             max-width: 400px;
-            /* FIX: Use 100% height of parent (body) and 100dvh as a fallback */
             height: 100dvh;
-            position: relative;
             border: 1px solid var(--border-color);
+            position: relative;
+            /* FIX: Flex column ensures the input area is always the "bottom" floor */
+            display: flex;
+            flex-direction: column;
             user-select: none;
             -webkit-user-select: none;
-            overflow: hidden; /* Prevents internal elements from pushing the container larger */
         }
 
-        /* --- Design remains exactly as you had it --- */
+        /* --- Header --- */
         .header {
             display: flex;
             justify-content: space-between;
@@ -67,9 +65,15 @@
         .status-text { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; }
         .status-text.connected { color: var(--accent-white); }
 
+        /* --- Middle Section (Your Design) --- */
+        .middle-content {
+            flex: 1;
+            position: relative; /* Keeps your absolute positioning working inside here */
+        }
+
         .log-area {
             position: absolute;
-            top: 75px; left: 20px; right: 20px;
+            top: 15px; left: 20px; right: 20px;
             height: 105px;
             background: var(--bg-log);
             border: 1px solid var(--btn-border);
@@ -83,21 +87,12 @@
 
         .btn-cluster {
             position: absolute;
-            top: 255px;
+            top: 150px;
             left: 20px;
             display: flex;
             flex-direction: column;
             gap: 18px;
             width: 210px;
-            z-index: 5;
-        }
-
-        @media (max-width: 380px) {
-            .btn-cluster { width: 170px; }
-            .action-btn { font-size: 12px; padding: 0 15px; }
-            /* Adjust top position for very small screens to prevent collision with input */
-            .btn-cluster { top: 220px; gap: 12px; }
-            .arc-container { top: 200px; }
         }
 
         .action-btn {
@@ -116,16 +111,19 @@
         }
 
         .action-btn .icon {
-            width: 22px; height: 22px; margin-right: 18px; fill: var(--accent-white);
+            width: 22px; height: 22px; margin-right: 18px;
             display: flex; align-items: center; justify-content: center;
         }
 
+        /* FIX: Made Reboot SVG inherit the #aaa color so it's not too bright */
+        .action-btn svg { fill: #aaa; } 
+
         .action-btn:active { background: var(--accent-white); color: var(--bg-main); }
-        .action-btn:active .icon, .action-btn:active .icon svg { fill: var(--bg-main); color: var(--bg-main); }
+        .action-btn:active .icon, .action-btn:active svg { fill: var(--bg-main); color: var(--bg-main); }
 
         .arc-container {
             position: absolute;
-            top: 240px; 
+            top: 130px; 
             right: 0px;
             width: 160px;
             height: 320px;
@@ -133,41 +131,57 @@
             touch-action: none;
         }
 
-        .input-area {
-            position: absolute;
-            /* FIX: Increased bottom spacing + Safe Area for modern phones */
-            bottom: calc(15px + env(safe-area-inset-bottom)); 
-            left: 20px;
-            right: 20px;
+        /* --- New Integrated Input Area --- */
+        .input-footer {
+            padding: 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            background: var(--bg-panel);
+        }
+
+        .input-wrapper {
+            position: relative;
             display: flex;
-            gap: 10px;
-            z-index: 10;
+            align-items: center;
         }
 
         .text-input {
-            flex: 1;
+            width: 100%;
             background: var(--bg-input);
             border: 1px solid var(--btn-border);
             color: var(--accent-white);
             font-size: 16px;
-            padding: 15px 20px;
+            padding: 15px 60px 15px 20px; /* Extra padding on right for button */
             border-radius: 30px;
             outline: none;
             -webkit-user-select: text;
         }
 
-        .send-btn {
+        .inner-send-btn {
+            position: absolute;
+            right: 8px;
+            height: 40px;
+            width: 40px;
             background: var(--accent-white);
             color: var(--bg-main);
             border: none;
-            border-radius: 30px;
-            padding: 0 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: bold;
-            text-transform: uppercase;
             cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .inner-send-btn:active { transform: scale(0.9); opacity: 0.8; }
+
+        @media (max-width: 380px) {
+            .btn-cluster { width: 170px; top: 140px; gap: 12px; }
+            .arc-container { top: 120px; }
         }
     </style>
 </head>
+
 <body>
     <main class="remote">
         <header class="header">
@@ -175,42 +189,46 @@
             <span id="status-text" class="status-text">Disconnected</span>
         </header>
 
-        <section class="log-area" id="output-log">
-            <div style="color: var(--accent-white);">Text Log</div>
-        </section>
+        <div class="middle-content">
+            <section class="log-area" id="output-log">
+                <div style="color: var(--accent-white);">Text Log</div>
+            </section>
 
-        <nav class="btn-cluster">
-            <button class="action-btn" onclick="sendCommand('_seq_')">
-                <span class="icon" style="font-size: 20px;">▶</span>Seq
-            </button>
-            <button class="action-btn" onclick="sendCommand('_clear_')">
-                <span class="icon" style="font-size: 20px;">✕</span>Clear
-            </button>
-            <button class="action-btn" onclick="sendCommand('_reboot_')">
-                <span class="icon">
-                    <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
-                </span>Reboot
-            </button>
-        </nav>
+            <nav class="btn-cluster">
+                <button class="action-btn" onclick="sendCommand('_seq_')">
+                    <span class="icon" style="font-size: 20px; color: white;">▶</span>Seq
+                </button>
+                <button class="action-btn" onclick="sendCommand('_clear_')">
+                    <span class="icon" style="font-size: 20px; color: white;">✕</span>Clear
+                </button>
+                <button class="action-btn" onclick="sendCommand('_reboot_')">
+                    <span class="icon">
+                        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+                    </span>Reboot
+                </button>
+            </nav>
 
-        <div class="arc-container" id="arcContainer">
-            <svg viewBox="-30 0 170 300" style="pointer-events: none;">
-                <g id="ticks"></g>
-                <text x="40" y="140" font-size="9" fill="#777">BRAILLE</text>
-                <text x="40" y="152" font-size="9" fill="#777">OUTPUT SPEED</text>
-                <circle cx="10" cy="150" r="22" fill="#0a0a0a" stroke="#888" stroke-width="2"/>
-                <text x="10" y="153" text-anchor="middle" font-size="13" fill="white" font-weight="600">
-                    <tspan id="speedValue">2.0</tspan><tspan font-size="8" fill="#888">s</tspan>
-                </text>
-                <text x="105" y="25" font-size="10" fill="#777">MAX</text>
-                <text x="105" y="285" font-size="10" fill="#777">MIN</text>
-            </svg>
+            <div class="arc-container" id="arcContainer">
+                <svg viewBox="-30 0 170 300" style="pointer-events: none;">
+                    <g id="ticks"></g>
+                    <text x="40" y="140" font-size="9" fill="#777">BRAILLE</text>
+                    <text x="40" y="152" font-size="9" fill="#777">OUTPUT SPEED</text>
+                    <circle cx="10" cy="150" r="22" fill="#0a0a0a" stroke="#888" stroke-width="2"/>
+                    <text x="10" y="153" text-anchor="middle" font-size="13" fill="white" font-weight="600">
+                        <tspan id="speedValue">2.0</tspan><tspan font-size="8" fill="#888">s</tspan>
+                    </text>
+                    <text x="105" y="25" font-size="10" fill="#777">MAX</text>
+                    <text x="105" y="285" font-size="10" fill="#777">MIN</text>
+                </svg>
+            </div>
         </div>
 
-        <section class="input-area">
-            <input id="textInput" class="text-input" placeholder="Enter text..." autocomplete="off">
-            <button class="send-btn" onclick="sendText()">Send</button>
-        </section>
+        <footer class="input-footer">
+            <div class="input-wrapper">
+                <input id="textInput" class="text-input" placeholder="Enter text..." autocomplete="off">
+                <button class="inner-send-btn" onclick="sendText()">↑</button>
+            </div>
+        </footer>
     </main>
 
     <script>
@@ -242,6 +260,11 @@
         }
 
         function sendCommand(cmd) { client.publish("tp/braille/input", cmd); }
+
+        // Trigger send on Enter key
+        document.getElementById("textInput").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendText();
+        });
 
         const arcContainer = document.getElementById("arcContainer");
         const ticksGroup = document.getElementById("ticks");
