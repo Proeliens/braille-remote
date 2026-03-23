@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
-        /* --- Design Tokens --- */
         :root {
             --bg-main: #000000;
             --bg-panel: #0a0a0a;
@@ -22,25 +21,23 @@
             --btn-border: #333333;
         }
 
-        /* --- Global Reset --- */
         body {
             background: var(--bg-main);
             color: var(--accent-white);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            height: 100dvh; /* FIX: Dynamic height for mobile browsers */
             overflow: hidden;
         }
 
-        /* --- Remote Container --- */
         .remote {
             background: var(--bg-panel);
             width: 100%;
             max-width: 400px;
-            height: 100vh;
+            height: 100dvh; /* FIX: Matches body */
             max-height: 850px;
             position: relative;
             border: 1px solid var(--border-color);
@@ -48,7 +45,6 @@
             -webkit-user-select: none;
         }
 
-        /* --- Header --- */
         .header {
             display: flex;
             justify-content: space-between;
@@ -57,29 +53,13 @@
             border-bottom: 1px solid var(--border-color);
         }
 
-        .header-title {
-            font-size: 16px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
+        .header-title { font-size: 16px; font-weight: 600; letter-spacing: 0.5px; }
+        .status-text { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; }
+        .status-text.connected { color: var(--accent-white); }
 
-        .status-text {
-            font-size: 12px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            font-weight: 700;
-        }
-
-        .status-text.connected {
-            color: var(--accent-white);
-        }
-
-        /* --- Terminal / Log Area --- */
         .log-area {
             position: absolute;
-            top: 75px;
-            left: 20px;
-            right: 20px;
+            top: 75px; left: 20px; right: 20px;
             height: 105px;
             background: var(--bg-log);
             border: 1px solid var(--btn-border);
@@ -91,7 +71,6 @@
             line-height: 1.4;
         }
 
-        /* --- Button Cluster --- */
         .btn-cluster {
             position: absolute;
             top: 255px;
@@ -100,6 +79,13 @@
             flex-direction: column;
             gap: 18px;
             width: 210px;
+            z-index: 5;
+        }
+
+        /* FIX: Prevents collision on small screens */
+        @media (max-width: 380px) {
+            .btn-cluster { width: 170px; }
+            .action-btn { font-size: 12px; padding: 0 15px; }
         }
 
         .action-btn {
@@ -114,29 +100,28 @@
             align-items: center;
             padding: 0 25px;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
             text-transform: uppercase;
         }
 
-        .action-btn span {
-            font-size: 22px;
+        /* Icon Styling */
+        .action-btn .icon {
+            width: 22px;
+            height: 22px;
             margin-right: 18px;
-            color: var(--accent-white);
+            fill: var(--accent-white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .action-btn:active {
             background: var(--accent-white);
             color: var(--bg-main);
-            transform: scale(0.98);
         }
+        .action-btn:active .icon, .action-btn:active .icon svg { fill: var(--bg-main); color: var(--bg-main); }
 
-        /* --- SVG Arc Slider --- */
         .arc-container {
             position: absolute;
-            /* CENTERED ALIGNMENT: 
-               Adjusted to 235px to perfectly intersect the 
-               center-line of the 'Clear' button.
-            */
             top: 240px; 
             right: 0px;
             width: 160px;
@@ -145,7 +130,6 @@
             touch-action: none;
         }
 
-        /* --- Input Area --- */
         .input-area {
             position: absolute;
             bottom: 25px;
@@ -164,7 +148,6 @@
             padding: 15px 20px;
             border-radius: 30px;
             outline: none;
-            user-select: text;
             -webkit-user-select: text;
         }
 
@@ -178,67 +161,57 @@
             text-transform: uppercase;
             cursor: pointer;
         }
-
-        .send-btn:active {
-            opacity: 0.8;
-        }
     </style>
 </head>
 
 <body>
-
     <main class="remote">
         <header class="header">
             <span class="header-title">BRAILLE CONTROLLER</span>
             <span id="status-text" class="status-text">Disconnected</span>
         </header>
 
-        <section class="log-area" id="output-log" aria-live="polite">
+        <section class="log-area" id="output-log">
             <div style="color: var(--accent-white);">Text Log</div>
         </section>
 
         <nav class="btn-cluster">
-            <button class="action-btn" onclick="sendCommand('_seq_')" aria-label="Restart Sequence">
-                <span>▶</span>Seq
+            <button class="action-btn" onclick="sendCommand('_seq_')">
+                <span class="icon" style="font-size: 20px;">▶</span>Seq
             </button>
 
-            <button class="action-btn" onclick="sendCommand('_clear_')" aria-label="Clear Text">
-                <span>✕</span>Clear
+            <button class="action-btn" onclick="sendCommand('_clear_')">
+                <span class="icon" style="font-size: 20px;">✕</span>Clear
             </button>
 
-            <button class="action-btn" onclick="sendCommand('_reboot_')" aria-label="Reboot System">
-                <span>⏻</span>Reboot
+            <button class="action-btn" onclick="sendCommand('_reboot_')">
+                <span class="icon">
+                    <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+                </span>Reboot
             </button>
         </nav>
 
-        <div class="arc-container" id="arcContainer" aria-label="Braille Output Speed Control">
-            <svg viewBox="-30 0 170 300">
+        <div class="arc-container" id="arcContainer">
+            <svg viewBox="-30 0 170 300" style="pointer-events: none;">
                 <g id="ticks"></g>
-                
                 <text x="40" y="140" font-size="9" fill="#777">BRAILLE</text>
                 <text x="40" y="152" font-size="9" fill="#777">OUTPUT SPEED</text>
-
                 <circle cx="10" cy="150" r="22" fill="#0a0a0a" stroke="#888" stroke-width="2"/>
-
                 <text x="10" y="153" text-anchor="middle" font-size="13" fill="white" font-weight="600">
-                    <tspan id="speedValue">2.0</tspan>
-                    <tspan font-size="8" fill="#888">s</tspan>
+                    <tspan id="speedValue">2.0</tspan><tspan font-size="8" fill="#888">s</tspan>
                 </text>
-
                 <text x="105" y="25" font-size="10" fill="#777">MAX</text>
                 <text x="105" y="285" font-size="10" fill="#777">MIN</text>
             </svg>
         </div>
 
         <section class="input-area">
-            <label for="textInput" style="display:none;">Braille Text Input</label>
             <input id="textInput" class="text-input" placeholder="Enter text..." autocomplete="off">
             <button class="send-btn" onclick="sendText()">Send</button>
         </section>
     </main>
 
     <script>
-        /* --- MQTT Logic --- */
         const client = mqtt.connect('wss://test.mosquitto.org:8081/mqtt');
         const outputLog = document.getElementById('output-log');
         const statusText = document.getElementById('status-text');
@@ -253,12 +226,9 @@
         });
 
         client.on('message', (topic, message) => {
-            if (topic === 'tp/braille/output') {
-                const msg = message.toString();
-                const cleanMsg = msg.replace(/^MESSAGE:\s*/i, '');
-                outputLog.innerHTML += `<div>${cleanMsg}</div>`;
-                outputLog.scrollTop = outputLog.scrollHeight;
-            }
+            const cleanMsg = message.toString().replace(/^MESSAGE:\s*/i, '');
+            outputLog.innerHTML += `<div>${cleanMsg}</div>`;
+            outputLog.scrollTop = outputLog.scrollHeight;
         });
 
         function sendText() {
@@ -269,94 +239,62 @@
             }
         }
 
-        function sendCommand(cmd) {
-            client.publish("tp/braille/input", cmd);
-        }
+        function sendCommand(cmd) { client.publish("tp/braille/input", cmd); }
 
-        document.getElementById("textInput").addEventListener("keypress", (e) => {
-            if (e.key === "Enter") sendText();
-        });
-
-        /* --- Arc Slider Wheel Logic --- */
+        /* --- Updated Arc Logic for Laptop & Phone --- */
         const arcContainer = document.getElementById("arcContainer");
         const ticksGroup = document.getElementById("ticks");
+        let isDragging = false, startY = 0, startSpeed = 0;
 
-        let isDragging = false;
-        let startY = 0;
-        let startSpeed = 0;
-
-        function renderWheel() {
+function renderWheel() {
             ticksGroup.innerHTML = "";
-            const cx = 130;
-            const cy = 150;
-            const rOuter = 120;
-
-            for (let s = 0.0; s <= 10.1; s += 0.2) {
-                s = Math.round(s * 10) / 10;
-                if (s < 0.1) continue;
-
-                const tickAngle = Math.PI + (s - currentSpeed) * -0.25;
-                const distFromCenter = Math.abs(tickAngle - Math.PI);
-
-                if (distFromCenter < 1.2) {
-                    const isMajorTick = (s % 1 === 0 || s === 0.1);
-                    const rInner = isMajorTick ? 104 : 112;
-
-                    const x1 = cx + rOuter * Math.cos(tickAngle);
-                    const y1 = cy + rOuter * Math.sin(tickAngle);
-                    const x2 = cx + rInner * Math.cos(tickAngle);
-                    const y2 = cy + rInner * Math.sin(tickAngle);
-
-                    const opacity = 1 - (distFromCenter / 1.2);
-
-                    ticksGroup.innerHTML += `
-                        <line 
-                            x1="${x1}" y1="${y1}" 
-                            x2="${x2}" y2="${y2}"
-                            stroke="rgba(255,255,255,${opacity})"
-                            stroke-width="${isMajorTick ? 3 : 2}" 
-                            stroke-linecap="round"
-                        />`;
+            const cx = 130, cy = 150, rOuter = 120;
+            
+            for (let s = 0.2; s <= 10; s += 0.2) {
+                // FIX: Round 's' to the nearest 10th to fix the "missing long hands" math glitch
+                const cleanS = Math.round(s * 10) / 10;
+                
+                const angle = Math.PI + (cleanS - currentSpeed) * -0.25;
+                const dist = Math.abs(angle - Math.PI);
+                
+                if (dist < 1.2) {
+                    const isMajor = cleanS % 1 === 0;
+                    const rInner = isMajor ? 104 : 112;
+                    
+                    ticksGroup.innerHTML += `<line 
+                        x1="${cx + rOuter * Math.cos(angle)}" 
+                        y1="${cy + rOuter * Math.sin(angle)}" 
+                        x2="${cx + rInner * Math.cos(angle)}" 
+                        y2="${cy + rInner * Math.sin(angle)}" 
+                        stroke="rgba(255,255,255,${1 - dist/1.2})" 
+                        stroke-width="${isMajor ? 3 : 2}" 
+                        stroke-linecap="round" />`;
                 }
             }
             speedDisplay.textContent = currentSpeed.toFixed(1);
         }
 
-        function dragStart(y) {
+        // Pointer Events work for both Mouse and Touch
+        arcContainer.addEventListener("pointerdown", e => {
             isDragging = true;
-            startY = y;
+            startY = e.clientY;
             startSpeed = currentSpeed;
-        }
+            arcContainer.setPointerCapture(e.pointerId); // Crucial for laptop dragging
+        });
 
-        function dragMove(y) {
+        window.addEventListener("pointermove", e => {
             if (!isDragging) return;
-            const delta = y - startY;
-            let newSpeed = startSpeed + (delta * 0.015);
-            newSpeed = Math.max(0.1, Math.min(10, newSpeed));
-            currentSpeed = Math.round(newSpeed * 10) / 10;
+            let newSpeed = startSpeed + (e.clientY - startY) * 0.015;
+            currentSpeed = Math.round(Math.max(0.1, Math.min(10, newSpeed)) * 10) / 10;
             renderWheel();
-        }
+        });
 
-        function dragEnd() {
+        window.addEventListener("pointerup", () => {
             if (isDragging) {
                 isDragging = false;
                 client.publish("tp/braille/speed", currentSpeed.toFixed(1));
             }
-        }
-
-        arcContainer.addEventListener("mousedown", e => {
-            e.preventDefault(); 
-            dragStart(e.clientY);
         });
-        window.addEventListener("mousemove", e => dragMove(e.clientY));
-        window.addEventListener("mouseup", dragEnd);
-
-        arcContainer.addEventListener("touchstart", e => {
-            dragStart(e.touches[0].clientY);
-            e.preventDefault();
-        }, { passive: false });
-        window.addEventListener("touchmove", e => dragMove(e.touches[0].clientY), { passive: false });
-        window.addEventListener("touchend", dragEnd);
 
         renderWheel();
     </script>
