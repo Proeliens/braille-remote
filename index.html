@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Braille Remote Controller</title>
+    
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        /* --- Design Tokens --- */
+        :root {
+            --bg-main: #000000;
+            --bg-panel: #0a0a0a;
+            --bg-input: #111111;
+            --bg-log: #050505;
+            --accent-white: #ffffff;
+            --border-color: #222222;
+            --text-secondary: #666666;
+            --text-log: #cccccc;
+            --btn-gray: #111111;
+            --btn-border: #333333;
+        }
+
+        /* --- Global Reset --- */
+        body {
+            background: var(--bg-main);
+            color: var(--accent-white);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Remote Container --- */
+        .remote {
+            background: var(--bg-panel);
+            width: 100%;
+            max-width: 400px;
+            height: 100vh;
+            max-height: 850px;
+            position: relative;
+            border: 1px solid var(--border-color);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- Header --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .status-text.connected {
+            color: var(--accent-white);
+        }
+
+        /* --- Terminal / Log Area --- */
+        .log-area {
+            position: absolute;
+            top: 75px;
+            left: 20px;
+            right: 20px;
+            height: 105px;
+            background: var(--bg-log);
+            border: 1px solid var(--btn-border);
+            border-radius: 12px;
+            padding: 12px;
+            overflow-y: auto;
+            font-size: 13px;
+            color: var(--text-log);
+            line-height: 1.4;
+        }
+
+        /* --- Button Cluster --- */
+        .btn-cluster {
+            position: absolute;
+            top: 255px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            width: 210px;
+        }
+
+        .action-btn {
+            height: 70px;
+            border-radius: 22px;
+            background: var(--btn-gray);
+            border: 1px solid var(--btn-border);
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            padding: 0 25px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            text-transform: uppercase;
+        }
+
+        .action-btn span {
+            font-size: 22px;
+            margin-right: 18px;
+            color: var(--accent-white);
+        }
+
+        .action-btn:active {
+            background: var(--accent-white);
+            color: var(--bg-main);
+            transform: scale(0.98);
+        }
+
+        /* --- SVG Arc Slider --- */
+        .arc-container {
+            position: absolute;
+            /* CENTERED ALIGNMENT: 
+               Adjusted to 235px to perfectly intersect the 
+               center-line of the 'Clear' button.
+            */
+            top: 240px; 
+            right: 0px;
+            width: 160px;
+            height: 320px;
+            cursor: ns-resize;
+            touch-action: none;
+        }
+
+        /* --- Input Area --- */
+        .input-area {
+            position: absolute;
+            bottom: 25px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .text-input {
+            flex: 1;
+            background: var(--bg-input);
+            border: 1px solid var(--btn-border);
+            color: var(--accent-white);
+            font-size: 16px;
+            padding: 15px 20px;
+            border-radius: 30px;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .send-btn {
+            background: var(--accent-white);
+            color: var(--bg-main);
+            border: none;
+            border-radius: 30px;
+            padding: 0 25px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .send-btn:active {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class="remote">
+        <header class="header">
+            <span class="header-title">BRAILLE CONTROLLER</span>
+            <span id="status-text" class="status-text">Disconnected</span>
+        </header>
+
+        <section class="log-area" id="output-log" aria-live="polite">
+            <div style="color: var(--accent-white);">Text Log</div>
+        </section>
+
+        <nav class="btn-cluster">
+            <button class="action-btn" onclick="sendCommand('_seq_')" aria-label="Restart Sequence">
+                <span>▶</span>Seq
+            </button>
+
+            <button class="action-btn" onclick="sendCommand('_clear_')" aria-label="Clear Text">
+                <span>✕</span>Clear
+            </button>
+
+            <button class="action-btn" onclick="sendCommand('_reboot_')" aria-label="Reboot System">
+                <span>⏻</span>Reboot
+            </button>
+        </nav>
+
+        <div class="arc-container" id="arcContainer" aria-label="Braille Output Speed Control">
+            <svg viewBox="-30 0 170 300">
+                <g id="ticks"></g>
+                
+                <text x="40" y="140" font-size="9" fill="#777">BRAILLE</text>
+                <text x="40" y="152" font-size="9" fill="#777">OUTPUT SPEED</text>
+
+                <circle cx="10" cy="150" r="22" fill="#0a0a0a" stroke="#888" stroke-width="2"/>
+
+                <text x="10" y="153" text-anchor="middle" font-size="13" fill="white" font-weight="600">
+                    <tspan id="speedValue">2.0</tspan>
+                    <tspan font-size="8" fill="#888">s</tspan>
+                </text>
+
+                <text x="105" y="25" font-size="10" fill="#777">MAX</text>
+                <text x="105" y="285" font-size="10" fill="#777">MIN</text>
+            </svg>
+        </div>
+
+        <section class="input-area">
+            <label for="textInput" style="display:none;">Braille Text Input</label>
+            <input id="textInput" class="text-input" placeholder="Enter text..." autocomplete="off">
+            <button class="send-btn" onclick="sendText()">Send</button>
+        </section>
+    </main>
+
+    <script>
+        /* --- MQTT Logic --- */
+        const client = mqtt.connect('wss://test.mosquitto.org:8081/mqtt');
+        const outputLog = document.getElementById('output-log');
+        const statusText = document.getElementById('status-text');
+        const speedDisplay = document.getElementById('speedValue');
+
+        let currentSpeed = 2.0;
+
+        client.on('connect', () => {
+            statusText.innerText = "Connected";
+            statusText.classList.add("connected");
+            client.subscribe('tp/braille/output');
+        });
+
+        client.on('message', (topic, message) => {
+            if (topic === 'tp/braille/output') {
+                const msg = message.toString();
+                const cleanMsg = msg.replace(/^MESSAGE:\s*/i, '');
+                outputLog.innerHTML += `<div>${cleanMsg}</div>`;
+                outputLog.scrollTop = outputLog.scrollHeight;
+            }
+        });
+
+        function sendText() {
+            const input = document.getElementById("textInput");
+            if (input.value.trim()) {
+                client.publish("tp/braille/input", input.value);
+                input.value = "";
+            }
+        }
+
+        function sendCommand(cmd) {
+            client.publish("tp/braille/input", cmd);
+        }
+
+        document.getElementById("textInput").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendText();
+        });
+
+        /* --- Arc Slider Wheel Logic --- */
+        const arcContainer = document.getElementById("arcContainer");
+        const ticksGroup = document.getElementById("ticks");
+
+        let isDragging = false;
+        let startY = 0;
+        let startSpeed = 0;
+
+        function renderWheel() {
+            ticksGroup.innerHTML = "";
+            const cx = 130;
+            const cy = 150;
+            const rOuter = 120;
+
+            for (let s = 0.0; s <= 10.1; s += 0.2) {
+                s = Math.round(s * 10) / 10;
+                if (s < 0.1) continue;
+
+                const tickAngle = Math.PI + (s - currentSpeed) * -0.25;
+                const distFromCenter = Math.abs(tickAngle - Math.PI);
+
+                if (distFromCenter < 1.2) {
+                    const isMajorTick = (s % 1 === 0 || s === 0.1);
+                    const rInner = isMajorTick ? 104 : 112;
+
+                    const x1 = cx + rOuter * Math.cos(tickAngle);
+                    const y1 = cy + rOuter * Math.sin(tickAngle);
+                    const x2 = cx + rInner * Math.cos(tickAngle);
+                    const y2 = cy + rInner * Math.sin(tickAngle);
+
+                    const opacity = 1 - (distFromCenter / 1.2);
+
+                    ticksGroup.innerHTML += `
+                        <line 
+                            x1="${x1}" y1="${y1}" 
+                            x2="${x2}" y2="${y2}"
+                            stroke="rgba(255,255,255,${opacity})"
+                            stroke-width="${isMajorTick ? 3 : 2}" 
+                            stroke-linecap="round"
+                        />`;
+                }
+            }
+            speedDisplay.textContent = currentSpeed.toFixed(1);
+        }
+
+        function dragStart(y) {
+            isDragging = true;
+            startY = y;
+            startSpeed = currentSpeed;
+        }
+
+        function dragMove(y) {
+            if (!isDragging) return;
+            const delta = y - startY;
+            let newSpeed = startSpeed + (delta * 0.015);
+            newSpeed = Math.max(0.1, Math.min(10, newSpeed));
+            currentSpeed = Math.round(newSpeed * 10) / 10;
+            renderWheel();
+        }
+
+        function dragEnd() {
+            if (isDragging) {
+                isDragging = false;
+                client.publish("tp/braille/speed", currentSpeed.toFixed(1));
+            }
+        }
+
+        arcContainer.addEventListener("mousedown", e => {
+            e.preventDefault(); 
+            dragStart(e.clientY);
+        });
+        window.addEventListener("mousemove", e => dragMove(e.clientY));
+        window.addEventListener("mouseup", dragEnd);
+
+        arcContainer.addEventListener("touchstart", e => {
+            dragStart(e.touches[0].clientY);
+            e.preventDefault();
+        }, { passive: false });
+        window.addEventListener("touchmove", e => dragMove(e.touches[0].clientY), { passive: false });
+        window.addEventListener("touchend", dragEnd);
+
+        renderWheel();
+    </script>
+</body>
+</html>
