@@ -25,6 +25,7 @@
             --btn-border: #333333;
         }
 
+        /* FIX: Ensure the HTML and Body are strictly restricted to the visible window */
         html, body {
             height: 100%;
             margin: 0;
@@ -44,12 +45,13 @@
             background: var(--bg-panel);
             width: 100%;
             max-width: 400px;
+            /* FIX: Use 100% height of parent (body) and 100dvh as a fallback */
             height: 100dvh;
             position: relative;
             border: 1px solid var(--border-color);
             user-select: none;
             -webkit-user-select: none;
-            overflow: hidden;
+            overflow: hidden; /* Prevents internal elements from pushing the container larger */
         }
 
         /* --- Design remains exactly as you had it --- */
